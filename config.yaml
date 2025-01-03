@@ -1,0 +1,8 @@
+mounts:
+  - backendName: "AllDebrid"
+    mountPoint: "/mnt/rclone/alldebrid"
+
+serves:
+  - backendName: "AllDebrid"
+    protocol: "webdav"
+    addr: "0.0.0.0:8080"

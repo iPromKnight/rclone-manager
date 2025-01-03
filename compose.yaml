@@ -1,0 +1,55 @@
+services:
+  rclone-manager:
+    image: ipromknight/rclone-manager:latest
+    container_name: rclone-manager
+    restart: unless-stopped
+    stop_signal: SIGTERM
+    stop_grace_period: 30s
+    ports:
+      - "5572:5572"  # Rclone RC API
+      - "8080:8080"
+    devices:
+      - /dev/fuse:/dev/fuse:rwm
+    cap_add:
+      - SYS_ADMIN
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - ./config.yaml:/data/config.yaml
+      - ./rclone.conf:/data/rclone.conf
+      - ./local-dev/mnt/rclone:/mnt/rclone:shared
+      - ./local-dev/caches/rclone:/caches/rclone
+    environment:
+      # General
+      RCLONE_BUFFER_SIZE: 0
+      RCLONE_BWLIMIT: 100M
+      RCLONE_BIND: 0.0.0.0
+      RCLONE_LOG_LEVEL: INFO
+      RCLONE_CACHE_DIR: /caches/rclone
+      RCLONE_DIR_CACHE_TIME: 10s
+      RCLONE_TIMEOUT: 10m
+      RCLONE_UMASK: 002
+      RCLONE_UID: 1000
+      RCLONE_GID: 1000
+      RCLONE_ALLOW_NON_EMPTY: "true"
+      RCLONE_ALLOW_OTHER: "true"
+      RCLONE_CONFIG: /data/rclone.conf
+
+      # RCD API
+      RCLONE_RC_ADDR: :5572
+      RCLONE_RC_NO_AUTH: "true"
+      RCLONE_RC_WEB_GUI: "true"
+      RCLONE_RC_WEB_GUI_NO_OPEN_BROWSER: "true"
+
+      # VFS DEFAULTS
+      RCLONE_VFS_MIN_FREE_SPACE: off
+      RCLONE_VFS_CACHE_MAX_AGE: 24h
+      RCLONE_VFS_MAX_CACHE_SIZE: 100G
+      RCLONE_VFS_CACHE_MODE: writes
+      RCLONE_VFS_READ_CHUNK_LIMIT: 64M
+      RCLONE_VFS_READ_CHUNK_SIZE: 5M
+
+      # MOUNT DEFAULTS
+      RCLONE_NO_TRAVERSE: "true"
+      RCLONE_IGNORE_EXISTING: "true"
+      RCLONE_POLL_INTERVAL: 0
