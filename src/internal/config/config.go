@@ -8,14 +8,16 @@ import (
 
 type Config struct {
 	Serves []struct {
-		BackendName string `yaml:"backendName"`
-		Protocol    string `yaml:"protocol"`
-		Addr        string `yaml:"addr"`
+		BackendName string            `yaml:"backendName"`
+		Protocol    string            `yaml:"protocol"`
+		Addr        string            `yaml:"addr"`
+		Environment map[string]string `yaml:"environment,omitempty"`
 	} `yaml:"serves"`
 
 	Mounts []struct {
-		BackendName string `yaml:"backendName"`
-		MountPoint  string `yaml:"mountPoint"`
+		BackendName string            `yaml:"backendName"`
+		MountPoint  string            `yaml:"mountPoint"`
+		Environment map[string]string `yaml:"environment,omitempty"`
 	} `yaml:"mounts"`
 }
 

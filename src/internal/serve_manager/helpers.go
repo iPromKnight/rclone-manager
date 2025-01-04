@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"rclone-manager/internal/config"
 	"rclone-manager/internal/constants"
+	"rclone-manager/internal/environment"
 )
 
 func getServeInstance(key string) (*ServeProcess, bool) {
@@ -25,6 +26,8 @@ func createServeCommand(instance *ServeProcess) *exec.Cmd {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
+	cmd.Env = environment.PrepareEnvironment(instance.EnvVars)
+
 	return cmd
 }
 
@@ -42,6 +45,7 @@ func setupServesFromConfig(conf *config.Config, logger zerolog.Logger) {
 			Backend:  serve.BackendName,
 			Protocol: serve.Protocol,
 			Addr:     serve.Addr,
+			EnvVars:  serve.Environment,
 		}
 		if existing, ok := getServeInstance(serve.BackendName); ok {
 			if existing.Protocol != serve.Protocol || existing.Addr != serve.Addr {

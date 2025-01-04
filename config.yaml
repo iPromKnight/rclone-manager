@@ -1,8 +1,28 @@
 mounts:
   - backendName: "AllDebrid"
     mountPoint: "/mnt/rclone/alldebrid"
+    environment:
+      RCLONE_BWLIMIT: off
+      RCLONE_READ_ONLY: true
+      RCLONE_VFS_READ_CHUNK_SIZE: 16M
+      RCLONE_VFS_READ_CHUNK_SIZE_LIMIT: 32M
 
 serves:
   - backendName: "AllDebrid"
     protocol: "webdav"
     addr: "0.0.0.0:8080"
+    environment:
+      RCLONE_BUFFER_SIZE: 0
+      RCLONE_BWLIMIT: 300M
+      RCLONE_COPY_LINKS: true
+      RCLONE_LINKS: false
+      RCLONE_MAX_HEADER_SIZE: 8192
+      RCLONE_VFS_READ_CHUNK_SIZE: 16M
+      RCLONE_VFS_READ_CHUNK_SIZE_LIMIT: 32M
+      RCLONE_STATS: 60s
+      RCLONE_VFS_CACHE_MODE: writes
+      RCLONE_CUTOFF_MODE: cautious
+      RCLONE_MULTI_THREAD_STREAMS: 0
+      RCLONE_DIR_CACHE_TIME: 10s
+      RCLONE_NO_MODTIME: true
+      RCLONE_READ_ONLY: true

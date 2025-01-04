@@ -42,6 +42,7 @@ func MonitorServeProcesses(logger zerolog.Logger) {
 					Backend:  serveProcess.Backend,
 					Protocol: serveProcess.Protocol,
 					Addr:     serveProcess.Addr,
+					EnvVars:  serveProcess.EnvVars,
 				}
 
 				newProcess := StartServeWithRetries(newServe, logger)

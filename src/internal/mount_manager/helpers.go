@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"rclone-manager/internal/config"
 	"rclone-manager/internal/constants"
+	"rclone-manager/internal/environment"
 	"syscall"
 )
 
@@ -34,6 +35,9 @@ func createMountCommand(instance *MountedEndpoint) *exec.Cmd {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+
+	cmd.Env = environment.PrepareEnvironment(instance.EnvVars)
+
 	return cmd
 }
 
@@ -81,6 +85,7 @@ func setupMountsFromConfig(conf *config.Config, logger zerolog.Logger) {
 		instance := &MountedEndpoint{
 			BackendName: mount.BackendName,
 			MountPoint:  mount.MountPoint,
+			EnvVars:     mount.Environment,
 		}
 		if existing, ok := getMountedEndpoint(mount.BackendName); ok {
 			if existing.MountPoint != instance.MountPoint {

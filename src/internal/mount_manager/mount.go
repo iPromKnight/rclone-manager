@@ -15,6 +15,7 @@ var (
 type MountedEndpoint struct {
 	BackendName string
 	MountPoint  string
+	EnvVars     map[string]string
 }
 
 func InitializeMounts(conf *config.Config, logger zerolog.Logger, processLock *sync.Mutex) {
@@ -31,6 +32,7 @@ func InitializeMounts(conf *config.Config, logger zerolog.Logger, processLock *s
 		instance := &MountedEndpoint{
 			BackendName: mount.BackendName,
 			MountPoint:  mount.MountPoint,
+			EnvVars:     mount.Environment,
 		}
 		StartMountWithRetries(instance, logger)
 	}

@@ -17,6 +17,7 @@ type ServeProcess struct {
 	Addr        string
 	StartedAt   time.Time
 	GracePeriod time.Duration
+	EnvVars     map[string]string
 }
 
 var (
@@ -38,6 +39,7 @@ func InitializeServeEndpoints(conf *config.Config, logger zerolog.Logger, proces
 			Backend:  serve.BackendName,
 			Protocol: serve.Protocol,
 			Addr:     serve.Addr,
+			EnvVars:  serve.Environment,
 		}
 		StartServeWithRetries(instance, logger)
 	}
