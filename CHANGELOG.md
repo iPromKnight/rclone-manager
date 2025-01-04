@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/iPromKnight/rclone-manager/compare/v1.1.0...v1.1.1) (2025-01-04)
+
+
+### 🔥 Bug Fixes
+
+* dockerhub username ([47ee56e](https://github.com/iPromKnight/rclone-manager/commit/47ee56efd0f97b29b30bb9a3eb89104c033410ed))
+
 ## [1.1.0](https://github.com/iPromKnight/rclone-manager/compare/v1.0.0...v1.1.0) (2025-01-04)
 
 
