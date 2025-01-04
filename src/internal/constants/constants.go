@@ -12,6 +12,8 @@ const (
 	MountPoint = "mountPoint="
 	Fs         = "fs="
 	Addr       = "--addr"
+	VfsOpt     = "vfsOpt="
+	MountOpt   = "mountOpt="
 )
 
 // Constants for fusermount

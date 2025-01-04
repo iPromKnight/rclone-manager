@@ -1,28 +1,26 @@
+# Define your Mounts for Rclone Backends here
 mounts:
+    # This is the name of the backend in your rclone.conf
   - backendName: "AllDebrid"
+    # This is the path to the mountpoint on the host
     mountPoint: "/mnt/rclone/alldebrid"
+    # These will be fully converted to vfsOpt and mountOpt payloads for the rclone mount command through RC. You can use your regular rclone env vars.
+    # They override the shared options in the environment section of the compose / running container for this specific mount.
     environment:
       RCLONE_BWLIMIT: off
       RCLONE_READ_ONLY: true
       RCLONE_VFS_READ_CHUNK_SIZE: 16M
       RCLONE_VFS_READ_CHUNK_SIZE_LIMIT: 32M
+      RCLONE_VFS_CACHE_MODE: full
 
+# Define your Rclone Serves here . All protocols are supported.
 serves:
+    # This is the name of the backend in your rclone.conf
   - backendName: "AllDebrid"
+    # This is the serve protocol: webdav, ftp, sftp, dlna, docker, nfs, restic, s3.
     protocol: "webdav"
+    # This is the port to bind the serve to.
     addr: "0.0.0.0:8080"
+    # These will override the shared options in the environment section of the compose / running container for this specific serve.
     environment:
       RCLONE_BUFFER_SIZE: 0
-      RCLONE_BWLIMIT: 300M
-      RCLONE_COPY_LINKS: true
-      RCLONE_LINKS: false
-      RCLONE_MAX_HEADER_SIZE: 8192
-      RCLONE_VFS_READ_CHUNK_SIZE: 16M
-      RCLONE_VFS_READ_CHUNK_SIZE_LIMIT: 32M
-      RCLONE_STATS: 60s
-      RCLONE_VFS_CACHE_MODE: writes
-      RCLONE_CUTOFF_MODE: cautious
-      RCLONE_MULTI_THREAD_STREAMS: 0
-      RCLONE_DIR_CACHE_TIME: 10s
-      RCLONE_NO_MODTIME: true
-      RCLONE_READ_ONLY: true

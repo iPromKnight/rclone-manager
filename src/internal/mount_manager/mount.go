@@ -9,13 +9,18 @@ import (
 )
 
 var (
-	instanceMap sync.Map
+	instanceMap   sync.Map
+	currentRCDEnv map[string]interface{}
 )
 
 type MountedEndpoint struct {
 	BackendName string
 	MountPoint  string
 	EnvVars     map[string]string
+}
+
+func SetRCDEnv(env map[string]interface{}) {
+	currentRCDEnv = env
 }
 
 func InitializeMounts(conf *config.Config, logger zerolog.Logger, processLock *sync.Mutex) {
@@ -42,16 +47,18 @@ func StartMountWithRetries(instance *MountedEndpoint, logger zerolog.Logger) {
 	retries := 0
 	for retries < 3 {
 		ensureMountPointExists(instance.MountPoint, logger)
-		cmd := createMountCommand(instance)
-		err := cmd.Run()
-		if err == nil {
-			logger.Info().Str(constants.LogBackend, instance.BackendName).
-				Str(constants.LogMountPoint, instance.MountPoint).
-				Msg("Mount successful.")
-			trackEndpoint(instance)
-			return
+		cmd := createMountCommand(instance, logger)
+		if cmd != nil {
+			err := cmd.Run()
+			if err == nil {
+				logger.Info().Str(constants.LogBackend, instance.BackendName).
+					Str(constants.LogMountPoint, instance.MountPoint).
+					Msg("Mount successful.")
+				trackEndpoint(instance)
+				return
+			}
 		}
-		logger.Warn().Err(err).Msgf("Mount failed. Retrying %d/3...", retries+1)
+		logger.Warn().Msgf("Mount failed. Retrying %d/3...", retries+1)
 		retries++
 		time.Sleep(5 * time.Second)
 	}
@@ -116,7 +123,7 @@ func UnmountAllByPath(conf *config.Config, logger zerolog.Logger) {
 		cmd := createFuseUnmountCommand(&MountedEndpoint{MountPoint: mount.MountPoint})
 		err := cmd.Run()
 		if err != nil {
-			logger.Warn().AnErr(constants.LogError, err).
+			logger.Debug().AnErr(constants.LogError, err).
 				Str(constants.LogMountPoint, mount.MountPoint).
 				Msg("Failed to unmount path. It may not be mounted.")
 		} else {

@@ -5,11 +5,21 @@ import (
 	"os"
 	"os/signal"
 	"rclone-manager/internal/rclone_manager"
+	"strings"
 	"syscall"
 	"time"
 )
 
-var logger = zerolog.New(os.Stdout).With().Timestamp().Logger()
+var logger zerolog.Logger
+
+func init() {
+	debugMode := os.Getenv("DEBUG_MODE")
+	if strings.ToLower(debugMode) == "true" || strings.ToLower(debugMode) == "1" {
+		logger = zerolog.New(os.Stdout).Level(zerolog.DebugLevel).With().Timestamp().Logger()
+	} else {
+		logger = zerolog.New(os.Stdout).Level(zerolog.InfoLevel).With().Timestamp().Logger()
+	}
+}
 
 func main() {
 	sigs := make(chan os.Signal, 1)

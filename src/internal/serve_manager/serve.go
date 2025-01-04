@@ -21,8 +21,13 @@ type ServeProcess struct {
 }
 
 var (
-	processMap sync.Map
+	processMap    sync.Map
+	currentRCDEnv map[string]interface{}
 )
+
+func SetRCDEnv(env map[string]interface{}) {
+	currentRCDEnv = env
+}
 
 func InitializeServeEndpoints(conf *config.Config, logger zerolog.Logger, processLock *sync.Mutex) {
 	processLock.Lock()

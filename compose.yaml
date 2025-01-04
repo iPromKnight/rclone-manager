@@ -1,12 +1,13 @@
 services:
   rclone-manager:
+    image: ipromknight/rclone-manager:latest
     container_name: rclone-manager
     restart: unless-stopped
     stop_signal: SIGTERM
     stop_grace_period: 30s
     ports:
       - "5572:5572"  # Rclone RC API
-      - "8080:8080"
+      - "8080:8080" # Add Mappings for any serves you have defined in config.yaml
     devices:
       - /dev/fuse:/dev/fuse:rwm
     cap_add:
@@ -19,36 +20,50 @@ services:
       - ./local-dev/mnt/rclone:/mnt/rclone:shared
       - ./local-dev/caches/rclone:/caches/rclone
     environment:
-      # General
-      RCLONE_BUFFER_SIZE: 0
+      # Rclone Manager Debug Messages (true/false)
+      DEBUG_MODE: "false"
+
+      # Customize Rclone Defaults
+      RCLONE_USE_MMAP: true
       RCLONE_BWLIMIT: off
       RCLONE_BIND: 0.0.0.0
       RCLONE_LOG_LEVEL: Info
       RCLONE_CACHE_DIR: /caches/rclone
-      RCLONE_DIR_CACHE_TIME: 10s
+      RCLONE_CONFIG: /data/rclone.conf
       RCLONE_TIMEOUT: 10m
       RCLONE_UMASK: 002
-      RCLONE_UID: 1000
-      RCLONE_GID: 1000
-      RCLONE_LINKS: true
+      RCLONE_UID: 568
+      RCLONE_GID: 568
+      RCLONE_ALLOW_NON_EMPTY: true
+      RCLONE_ALLOW_OTHER: true
+      RCLONE_BUFFER_SIZE: 0
+      RCLONE_DIR_CACHE_TIME: 10s
+      RCLONE_POLL_INTERVAL: 0
+      RCLONE_VFS_CACHE_MAX_AGE: 72h
+      RCLONE_VFS_CACHE_MAX_SIZE: 2G
+      RCLONE_VFS_CACHE_MIN_FREE_SPACE: off
+      RCLONE_VFS_CACHE_MODE: writes
+      RCLONE_VFS_CACHE_POLL_INTERVAL: 30s
+      RCLONE_VFS_DISK_SPACE_TOTAL_SIZE: 20G
+      RCLONE_VFS_FAST_FINGERPRINT: true
+      RCLONE_VFS_READ_AHEAD: 2M
+      RCLONE_VFS_READ_CHUNK_SIZE: 8M
+      RCLONE_VFS_READ_CHUNK_SIZE_LIMIT: 0
+      RCLONE_VFS_READ_WAIT: 5ms
+      RCLONE_VFS_REFRESH: true
+      RCLONE_READ_ONLY: true
+      RCLONE_NO_MODTIME: true
       RCLONE_MULTI_THREAD_STREAMS: 1
-      RCLONE_TRANSFERS: 1
-      RCLONE_ALLOW_NON_EMPTY: "true"
-      RCLONE_ALLOW_OTHER: "true"
-      RCLONE_CONFIG: /data/rclone.conf
+      RCLONE_TRANSFERS: 4
 
       # RCD API
       RCLONE_RC_ADDR: :5572
       RCLONE_RC_NO_AUTH: "true"
+
+      # RCD API Web GUI
       RCLONE_RC_WEB_GUI: "true"
       RCLONE_RC_WEB_GUI_NO_OPEN_BROWSER: "true"
+      RCLONE_RC_WEB_GUI_UPDATE: "true"
 
-      # VFS DEFAULTS
-      RCLONE_VFS_CACHE_MODE: writes
-      RCLONE_VFS_READ_CHUNK_SIZE: 10M
-      RCLONE_VFS_READ_CHUNK_SIZE_LIMIT: 10M
-
-      # MOUNT DEFAULTS
-      RCLONE_NO_TRAVERSE: "true"
-      RCLONE_IGNORE_EXISTING: "true"
-      RCLONE_POLL_INTERVAL: 0
+      ## Uncomment to use custom URL for fetching latest release. This is RcloneFM's URL.
+      # RCLONE_RC_WEB_FETCH_URL: "https://api.github.com/repos/retifrav/rclone-rc-web-gui/releases/latest"

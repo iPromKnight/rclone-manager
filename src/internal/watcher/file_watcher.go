@@ -19,7 +19,7 @@ func NewWatcher(callback func(string), logger zerolog.Logger) *Watcher {
 func (w *Watcher) Watch(files []string) {
 	for _, file := range files {
 		_ = w.watcher.Add(file)
-		w.logger.Info().Str("file", file).Msg("Watching for changes...")
+		w.logger.Debug().Str("file", file).Msg("Watching for changes...")
 	}
 
 	go func() {

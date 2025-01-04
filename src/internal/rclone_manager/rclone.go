@@ -25,7 +25,9 @@ var (
 	processLock sync.Mutex
 )
 
-var LoadedConfig *config.Config
+var (
+	LoadedConfig *config.Config
+)
 
 func InitializeRCD(logger zerolog.Logger) {
 
@@ -51,6 +53,8 @@ func InitializeRCD(logger zerolog.Logger) {
 	go MonitorRCDProcess(conf, logger)
 
 	waitForRCD(logger, 10)
+
+	propagateRCDEnv(logger)
 
 	if len(conf.Serves) > 0 {
 		go serve_manager.InitializeServeEndpoints(conf, logger, &processLock)
@@ -88,7 +92,7 @@ func StartRcloneRemoteDaemon(logger zerolog.Logger) *RCloneProcess {
 	}
 
 	trackRCD(rcloneProcess)
-	logger.Info().Int(constants.LogPid, cmd.Process.Pid).Msg("Started rclone RCD process")
+	logger.Debug().Int(constants.LogPid, cmd.Process.Pid).Msg("Started rclone RCD process")
 	return rcloneProcess
 }
 

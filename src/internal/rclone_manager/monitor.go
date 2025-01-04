@@ -44,6 +44,8 @@ func MonitorRCDProcess(conf *config.Config, logger zerolog.Logger) {
 				if newProcess != nil {
 					processMap.Store(key, newProcess)
 					logger.Info().Msgf("Successfully restarted rclone in RCD mode with new PID: %d", newProcess.PID)
+					waitForRCD(logger, 10)
+					propagateRCDEnv(logger)
 				} else {
 					logger.Error().Msg("Failed to restart rclone RCD process")
 				}
