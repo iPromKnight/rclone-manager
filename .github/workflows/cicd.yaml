@@ -51,8 +51,7 @@ jobs:
       - name: Push Service Image to repo
         uses: docker/build-push-action@v5
         with:
-          context: src
-          file: ./Dockerfile
+          context: "{{defaultContext}}:src"
           push: true
           provenance: mode=max
           tags: ${{ steps.docker-metadata.outputs.tags }}
