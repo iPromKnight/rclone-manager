@@ -3,6 +3,7 @@ package rclone_manager
 import (
 	"github.com/rs/zerolog"
 	"rclone-manager/internal/config"
+	"rclone-manager/internal/constants"
 	"rclone-manager/internal/mount_manager"
 	"rclone-manager/internal/utils"
 	"time"
@@ -31,7 +32,7 @@ func MonitorRCDProcess(conf *config.Config, logger zerolog.Logger) {
 			rCloneProcess := value.(*RCloneProcess)
 
 			if time.Since(rCloneProcess.StartedAt) < rCloneProcess.GracePeriod {
-				logger.Debug().Int("pid", rCloneProcess.PID).Msg("Skipping process check (within grace period)")
+				logger.Debug().Int(constants.LogPid, rCloneProcess.PID).Msg("Skipping process check (within grace period)")
 				return true
 			}
 

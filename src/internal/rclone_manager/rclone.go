@@ -2,10 +2,9 @@ package rclone_manager
 
 import (
 	"github.com/rs/zerolog"
-	"net/http"
-	"os"
 	"os/exec"
 	"rclone-manager/internal/config"
+	"rclone-manager/internal/constants"
 	"rclone-manager/internal/mount_manager"
 	"rclone-manager/internal/serve_manager"
 	"rclone-manager/internal/utils"
@@ -22,12 +21,17 @@ type RCloneProcess struct {
 }
 
 var (
-	processMap sync.Map
+	processMap  sync.Map
+	processLock sync.Mutex
 )
 
-func InitializeRCD(logger zerolog.Logger) *config.Config {
+var LoadedConfig *config.Config
+
+func InitializeRCD(logger zerolog.Logger) {
+
 	conf, err := config.LoadConfig()
 	if err != nil {
+
 		logger.Fatal().Err(err).Msg("Failed to load configuration")
 	}
 
@@ -35,31 +39,32 @@ func InitializeRCD(logger zerolog.Logger) *config.Config {
 		logger.Warn().Msg("No serves or mounts found in configuration. Running in RCD-only mode.")
 	}
 
+	processLock.Lock()
+	defer processLock.Unlock()
+
+	LoadedConfig = conf
+
 	mount_manager.UnmountAllByPath(conf, logger)
 
 	logger.Info().Msg("Initializing Rclone in RCD mode")
 	go StartRcloneRemoteDaemon(logger)
 	go MonitorRCDProcess(conf, logger)
 
-	WaitForRCD(logger, 10)
+	waitForRCD(logger, 10)
 
 	if len(conf.Serves) > 0 {
-		go serve_manager.InitializeServeEndpoints(conf, logger)
+		go serve_manager.InitializeServeEndpoints(conf, logger, &processLock)
 	}
 
 	if len(conf.Mounts) > 0 {
-		go mount_manager.InitializeMounts(conf, logger)
+		go mount_manager.InitializeMounts(conf, logger, &processLock)
 	}
 
-	return conf
+	startFileWatcher(logger)
 }
 
 func StartRcloneRemoteDaemon(logger zerolog.Logger) *RCloneProcess {
-	cmd := exec.Command("rclone", "rcd")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-
+	cmd := createStartRcdCommand()
 	err := cmd.Start()
 	if err != nil {
 		logger.Fatal().Err(err).Msg("Failed to start rclone RCD")
@@ -82,17 +87,17 @@ func StartRcloneRemoteDaemon(logger zerolog.Logger) *RCloneProcess {
 		GracePeriod: 10 * time.Second,
 	}
 
-	processMap.Store("RCD", rcloneProcess)
-	logger.Info().Int("pid", cmd.Process.Pid).Msg("Started rclone RCD process")
+	trackRCD(rcloneProcess)
+	logger.Info().Int(constants.LogPid, cmd.Process.Pid).Msg("Started rclone RCD process")
 	return rcloneProcess
 }
 
-func StopRcloneRemoteDaemon(conf *config.Config, logger zerolog.Logger) {
+func StopRcloneRemoteDaemon(logger zerolog.Logger) {
 	shouldMonitorProcesses = false
-	if rcd, ok := processMap.Load("RCD"); ok {
+	if rcd, ok := processMap.Load(constants.Rcd); ok {
 		if !utils.ProcessIsRunning(rcd.(*RCloneProcess).PID) {
 			logger.Warn().Msg("RCD process is not running")
-			mount_manager.UnmountAllByPath(conf, logger)
+			mount_manager.UnmountAllByPath(LoadedConfig, logger)
 			return
 		}
 
@@ -103,29 +108,7 @@ func StopRcloneRemoteDaemon(conf *config.Config, logger zerolog.Logger) {
 		if err != nil {
 			return
 		}
-		processMap.Delete("RCD")
+		untrackRCD()
 		logger.Info().Msg("Stopped rclone RCD process")
 	}
-}
-
-func PingRCD(logger zerolog.Logger) bool {
-	resp, err := http.Get("http://localhost:5572")
-	if err != nil || resp.StatusCode != http.StatusOK {
-		return false
-	}
-	logger.Debug().Msg("Rclone RCD is responsive")
-	return true
-}
-
-func WaitForRCD(logger zerolog.Logger, maxRetries int) {
-	for i := 0; i < maxRetries; i++ {
-		if PingRCD(logger) {
-			logger.Info().Msg("Rclone RCD is ready for mounts")
-			return
-		}
-		logger.Warn().Msgf("Rclone RCD not ready. Retrying... (%d/%d)", i+1, maxRetries)
-		time.Sleep(5 * time.Second)
-	}
-
-	logger.Fatal().Msg("Rclone RCD failed to start after retries. Exiting...")
 }

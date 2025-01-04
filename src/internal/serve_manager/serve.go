@@ -2,11 +2,10 @@ package serve_manager
 
 import (
 	"github.com/rs/zerolog"
-	"os"
 	"os/exec"
 	"rclone-manager/internal/config"
+	"rclone-manager/internal/constants"
 	"sync"
-	"syscall"
 	"time"
 )
 
@@ -24,7 +23,10 @@ var (
 	processMap sync.Map
 )
 
-func InitializeServeEndpoints(conf *config.Config, logger zerolog.Logger) {
+func InitializeServeEndpoints(conf *config.Config, logger zerolog.Logger, processLock *sync.Mutex) {
+	processLock.Lock()
+	defer processLock.Unlock()
+
 	if len(conf.Serves) == 0 {
 		logger.Debug().Msg("No rclone serve endpoints defined... Skipping starting any")
 		return
@@ -32,59 +34,68 @@ func InitializeServeEndpoints(conf *config.Config, logger zerolog.Logger) {
 
 	logger.Info().Msg("Initializing all serve endpoints")
 	for _, serve := range conf.Serves {
-		StartServe(serve.BackendName, serve.Protocol, serve.Addr, logger)
+		instance := &ServeProcess{
+			Backend:  serve.BackendName,
+			Protocol: serve.Protocol,
+			Addr:     serve.Addr,
+		}
+		StartServeWithRetries(instance, logger)
 	}
 
 	go MonitorServeProcesses(logger)
 }
 
-func StartServe(backend, protocol, addr string, logger zerolog.Logger) *ServeProcess {
-	cmd := exec.Command("rclone", "serve", protocol, backend+":", "--addr", addr)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true} // Detach from parent
-
-	err := cmd.Start()
-	if err != nil {
-		logger.Error().Err(err).Str("backend", backend).Msg("Failed to start serve process")
-		return nil
+func StartServeWithRetries(instance *ServeProcess, logger zerolog.Logger) *ServeProcess {
+	retries := 0
+	for retries < 3 {
+		cmd := createServeCommand(instance)
+		instance.Command = cmd
+		err := cmd.Start()
+		if err == nil {
+			logger.Info().
+				Str(constants.LogBackend, instance.Backend).
+				Str(constants.LogProtocol, instance.Protocol).
+				Str(constants.LogAddr, instance.Addr).
+				Msg("Serve started successfully.")
+			instance.PID = cmd.Process.Pid
+			instance.StartedAt = time.Now()
+			instance.GracePeriod = 10 * time.Second
+			trackServe(instance)
+			return instance
+		}
+		logger.Warn().AnErr(constants.LogError, err).Msgf("Serve failed. Retrying %d/3...", retries+1)
+		retries++
+		time.Sleep(5 * time.Second)
 	}
-
-	go func() {
-		_ = cmd.Wait()
-		logger.Warn().Str("backend", backend).Msgf("Process (PID: %d) exited", cmd.Process.Pid)
-	}()
-
-	serveProcess := &ServeProcess{
-		PID:         cmd.Process.Pid,
-		Command:     cmd,
-		Backend:     backend,
-		Protocol:    protocol,
-		Addr:        addr,
-		StartedAt:   time.Now(),
-		GracePeriod: 10 * time.Second, // 10-second grace period
-	}
-
-	processMap.Store(backend, serveProcess)
-	logger.Info().Int("pid", cmd.Process.Pid).Str("backend", backend).Msg("Started rclone serve process")
-	return serveProcess
+	logger.Error().Str(constants.LogBackend, instance.Backend).Msg("Failed to start serve after 3 attempts.")
+	return nil
 }
 
-func StopServe(serveProcess *ServeProcess, logger zerolog.Logger) {
-	if err := serveProcess.Command.Process.Kill(); err == nil {
-		logger.Info().Int("pid", serveProcess.PID).Str("backend", serveProcess.Backend).Msg("Serve process stopped")
-		processMap.Delete(serveProcess.Backend)
+func StopServe(instance *ServeProcess, logger zerolog.Logger) {
+	logger.Info().Str(constants.LogBackend, instance.Backend).Msg("Stopping serve process...")
+	if err := instance.Command.Process.Kill(); err == nil {
+		untrackServe(instance)
+		logger.Info().Int(constants.LogPid, instance.PID).Str(constants.LogBackend, instance.Backend).Msg("Serve process stopped")
 	} else {
-		logger.Warn().Err(err).Int("pid", serveProcess.PID).Str("backend", serveProcess.Backend).Msg("Failed to stop rclone serve process")
+		logger.Warn().AnErr(constants.LogError, err).Int(constants.LogPid, instance.PID).Str(constants.LogBackend, instance.Backend).Msg("Failed to stop serve process")
 	}
 }
 
 func Cleanup(logger zerolog.Logger) {
-	logger.Info().Msg("Cleaning up all rclone serve utils")
-	shouldMonitorProcesses = false
+	logger.Info().Msg("Cleaning up all rclone serve processes")
 	processMap.Range(func(key, value interface{}) bool {
-		serveProcess := value.(*ServeProcess)
-		StopServe(serveProcess, logger)
+		instance := value.(*ServeProcess)
+		StopServe(instance, logger)
 		return true
 	})
+}
+
+func ReconcileServes(conf *config.Config, logger zerolog.Logger, processLock *sync.Mutex) {
+	processLock.Lock()
+	defer processLock.Unlock()
+
+	logger.Info().Msg("Reconciling serves...")
+
+	setupServesFromConfig(conf, logger)
+	removeStaleServes(conf, logger)
 }

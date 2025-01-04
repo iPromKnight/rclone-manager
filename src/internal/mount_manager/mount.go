@@ -2,14 +2,25 @@ package mount_manager
 
 import (
 	"github.com/rs/zerolog"
-	"os"
-	"os/exec"
 	"rclone-manager/internal/config"
-	"syscall"
+	"rclone-manager/internal/constants"
+	"sync"
 	"time"
 )
 
-func InitializeMounts(conf *config.Config, logger zerolog.Logger) {
+var (
+	instanceMap sync.Map
+)
+
+type MountedEndpoint struct {
+	BackendName string
+	MountPoint  string
+}
+
+func InitializeMounts(conf *config.Config, logger zerolog.Logger, processLock *sync.Mutex) {
+	processLock.Lock()
+	defer processLock.Unlock()
+
 	if len(conf.Mounts) == 0 {
 		logger.Debug().Msg("No rclone mount endpoints defined... Skipping...")
 		return
@@ -17,80 +28,98 @@ func InitializeMounts(conf *config.Config, logger zerolog.Logger) {
 
 	logger.Info().Msg("Initializing all Mounts")
 	for _, mount := range conf.Mounts {
-		StartMountWithRetries(mount.BackendName, mount.MountPoint, logger)
+		instance := &MountedEndpoint{
+			BackendName: mount.BackendName,
+			MountPoint:  mount.MountPoint,
+		}
+		StartMountWithRetries(instance, logger)
 	}
 }
 
-func StartMountWithRetries(backend string, mountPoint string, logger zerolog.Logger) {
+func StartMountWithRetries(instance *MountedEndpoint, logger zerolog.Logger) {
 	retries := 0
 	for retries < 3 {
-		ensureMountPointExists(mountPoint, logger)
-		cmd := exec.Command("rclone", "rc", "mount/mount", "fs="+backend+":", "mountPoint="+mountPoint)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
+		ensureMountPointExists(instance.MountPoint, logger)
+		cmd := createMountCommand(instance)
 		err := cmd.Run()
 		if err == nil {
-			logger.Info().Str("backend", backend).Str("mountPoint", mountPoint).
+			logger.Info().Str(constants.LogBackend, instance.BackendName).
+				Str(constants.LogMountPoint, instance.MountPoint).
 				Msg("Mount successful.")
+			trackEndpoint(instance)
 			return
 		}
 		logger.Warn().Err(err).Msgf("Mount failed. Retrying %d/3...", retries+1)
 		retries++
 		time.Sleep(5 * time.Second)
 	}
-	logger.Error().Str("backend", backend).Msg("Failed to mount after 3 attempts.")
+	logger.Error().Str(constants.LogBackend, instance.BackendName).Msg("Failed to mount after 3 attempts.")
 }
 
 func StopAllMountsViaRCD(logger zerolog.Logger) {
 	logger.Info().Msg("Unmounting all rclone mounts")
-	cmd := exec.Command("rclone", "rc", "mount/umountall")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-
-	err := cmd.Start()
+	cmd := createUnmountAllCommand()
+	err := cmd.Run()
 	if err != nil {
-		logger.Error().AnErr("error", err).Msg("Failed to unmount all rclone mounts")
+		logger.Error().AnErr(constants.LogError, err).Msg("Failed to unmount all rclone mounts")
 		return
 	}
 
+	instanceMap.Clear()
 	logger.Info().Msg("Unmounted all rclone mounts successfully.")
+}
+
+func UnmountInstanceViaRcdWithFuseFallback(instance *MountedEndpoint, logger zerolog.Logger) bool {
+	logger.Info().Str(constants.LogBackend, instance.BackendName).
+		Str(constants.LogMountPoint, instance.MountPoint).
+		Msg("Unmounting Endpoint")
+
+	cmd := createUnmountCommand(instance)
+	err := cmd.Run()
+	if err != nil {
+		logger.Error().AnErr(constants.LogError, err).
+			Msg("Failed to unmount via rc. Falling back to fusermount.")
+		cmd := createFuseUnmountCommand(instance)
+		err := cmd.Run()
+		if err != nil {
+			logger.Error().Str(constants.LogBackend, instance.BackendName).
+				Str(constants.LogMountPoint, instance.MountPoint).
+				AnErr(constants.LogError, err).
+				Msg("Failed to unmount rclone mount via fuse fallback")
+			return false
+		}
+	}
+
+	logger.Info().Str(constants.LogBackend, instance.BackendName).
+		Str(constants.LogMountPoint, instance.MountPoint).
+		Msg("Unmounted mount-point successfully.")
+	return true
+}
+
+func ReconcileMounts(conf *config.Config, logger zerolog.Logger, processLock *sync.Mutex) {
+	processLock.Lock()
+	defer processLock.Unlock()
+
+	logger.Info().Msg("Reconciling mounts...")
+
+	setupMountsFromConfig(conf, logger)
+	removeStaleMounts(conf, logger)
 }
 
 func UnmountAllByPath(conf *config.Config, logger zerolog.Logger) {
 	logger.Info().Msg("Unmounting all paths listed in config...")
 
 	for _, mount := range conf.Mounts {
-		logger.Info().Str("path", mount.MountPoint).Msg("Unmounting...")
-		cmd := exec.Command("fusermount", "-u", mount.MountPoint)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
+		logger.Info().Str(constants.MountPoint, mount.MountPoint).Msg("Unmounting...")
+		cmd := createFuseUnmountCommand(&MountedEndpoint{MountPoint: mount.MountPoint})
 		err := cmd.Run()
 		if err != nil {
-			logger.Warn().Err(err).Str("path", mount.MountPoint).Msg("Failed to unmount path. It may not be mounted.")
+			logger.Warn().AnErr(constants.LogError, err).
+				Str(constants.LogMountPoint, mount.MountPoint).
+				Msg("Failed to unmount path. It may not be mounted.")
 		} else {
-			logger.Info().Str("path", mount.MountPoint).Msg("Unmounted successfully.")
-		}
-	}
-}
-
-func ReloadMounts(conf *config.Config, logger zerolog.Logger) {
-	UnmountAllByPath(conf, logger)
-	logger.Info().Msg("Reloading all mounts from config...")
-
-	for _, mount := range conf.Mounts {
-		StartMountWithRetries(mount.BackendName, mount.MountPoint, logger)
-	}
-}
-
-func ensureMountPointExists(mountPoint string, logger zerolog.Logger) {
-	if _, err := os.Stat(mountPoint); os.IsNotExist(err) {
-		logger.Info().Str("mountPoint", mountPoint).Msg("Creating mount point...")
-		err := os.MkdirAll(mountPoint, 0777)
-		if err != nil {
-			logger.Error().Err(err).Str("mountPoint", mountPoint).Msg("Failed to create mount point")
-		} else {
-			logger.Info().Str("mountPoint", mountPoint).Msg("Mount point created successfully.")
+			logger.Info().Str(constants.LogMountPoint, mount.MountPoint).
+				Msg("Unmounted successfully.")
 		}
 	}
 }

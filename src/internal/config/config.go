@@ -3,9 +3,8 @@ package config
 import (
 	"gopkg.in/yaml.v3"
 	"os"
+	"rclone-manager/internal/constants"
 )
-
-const YAMLPath = "/data/config.yaml"
 
 type Config struct {
 	Serves []struct {
@@ -21,7 +20,7 @@ type Config struct {
 }
 
 func LoadConfig() (*Config, error) {
-	data, err := os.ReadFile(YAMLPath)
+	data, err := os.ReadFile(constants.YAMLPath)
 	if err != nil {
 		return nil, err
 	}
@@ -32,4 +31,22 @@ func LoadConfig() (*Config, error) {
 		return nil, err
 	}
 	return &config, nil
+}
+
+func IsMountInConfig(mountPoint string, conf *Config) bool {
+	for _, mount := range conf.Mounts {
+		if mount.MountPoint == mountPoint {
+			return true
+		}
+	}
+	return false
+}
+
+func IsServeInConfig(backend string, conf *Config) bool {
+	for _, mount := range conf.Serves {
+		if mount.BackendName == backend {
+			return true
+		}
+	}
+	return false
 }
