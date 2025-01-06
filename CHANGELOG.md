@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1](https://github.com/iPromKnight/rclone-manager/compare/v1.2.0...v1.2.1) (2025-01-06)
+
+
+### 🔥 Bug Fixes
+
+* ensure monitors work ([b05170c](https://github.com/iPromKnight/rclone-manager/commit/b05170c281510bbf7a4f9c170b7ba1b21a60f9f9))
+
 ## [1.2.0](https://github.com/iPromKnight/rclone-manager/compare/v1.1.3...v1.2.0) (2025-01-06)
 
 
