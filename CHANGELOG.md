@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.3](https://github.com/iPromKnight/rclone-manager/compare/v1.1.2...v1.1.3) (2025-01-06)
+
+
+### ⚙️ Chores
+
+* extra debug logging around env var replacement ([99e382b](https://github.com/iPromKnight/rclone-manager/commit/99e382bee4edc027f4241ca511ea9715a4553ce2))
+
 ## [1.1.2](https://github.com/iPromKnight/rclone-manager/compare/v1.1.1...v1.1.2) (2025-01-04)
 
 
