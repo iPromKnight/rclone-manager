@@ -22,5 +22,3 @@ RUN ln -s /usr/bin/fusermount3 /usr/bin/fusermount
 COPY --from=build /app/rclone-manager /usr/local/bin/rclone-manager
 
 ENTRYPOINT ["/usr/local/bin/rclone-manager"]
-
-HEALTHCHECK --interval=10s --timeout=30s --start-period=5s --retries=3 CMD curl -f http://localhost:5572 || exit 1
