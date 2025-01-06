@@ -26,7 +26,7 @@ func createServeCommand(instance *ServeProcess) *exec.Cmd {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	cmd.Env = environment.PrepareEnvironment(instance.EnvVars)
+	cmd.Env = environment.PrepareEnvironment(instance.Environment)
 
 	return cmd
 }
@@ -42,10 +42,10 @@ func untrackServe(instance *ServeProcess) {
 func setupServesFromConfig(conf *config.Config, logger zerolog.Logger) {
 	for _, serve := range conf.Serves {
 		instance := &ServeProcess{
-			Backend:  serve.BackendName,
-			Protocol: serve.Protocol,
-			Addr:     serve.Addr,
-			EnvVars:  serve.Environment,
+			Backend:     serve.BackendName,
+			Protocol:    serve.Protocol,
+			Addr:        serve.Addr,
+			Environment: serve.Environment,
 		}
 		if existing, ok := getServeInstance(serve.BackendName); ok {
 			if existing.Protocol != serve.Protocol || existing.Addr != serve.Addr {

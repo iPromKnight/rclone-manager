@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"rclone-manager/internal/config"
 	"rclone-manager/internal/constants"
+	"rclone-manager/internal/environment"
 	"reflect"
 	"strconv"
 	"strings"
@@ -42,7 +43,7 @@ func createMountCommand(instance *MountedEndpoint, logger zerolog.Logger) *exec.
 	fsArg := fmt.Sprintf("%s%s:", constants.Fs, instance.BackendName)
 	mountPointArg := fmt.Sprintf("%s%s", constants.MountPoint, instance.MountPoint)
 
-	payloads, err := constructPayloadsFromCombinedEnvVars(currentRCDEnv, instance.EnvVars, logger)
+	payloads, err := constructPayloadsFromCombinedEnvVars(currentRCDEnv, instance.Environment, logger)
 	if err != nil {
 		logger.Error().AnErr(constants.LogError, err).Str(constants.LogBackend, instance.BackendName).
 			Msg("Failed to construct mount payloads")
@@ -56,6 +57,8 @@ func createMountCommand(instance *MountedEndpoint, logger zerolog.Logger) *exec.
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+
+	cmd.Env = environment.PrepareEnvironment(instance.Environment)
 
 	return cmd
 }
@@ -74,12 +77,17 @@ func constructPayloadsFromCombinedEnvVars(options map[string]interface{}, envVar
 	mountTags := extractConfigTags(&mountlib.Options{}, logger)
 	vfsTags := extractConfigTags(&vfscommon.Options{}, logger)
 
-	// Update options using extracted config tags
-	updateOptionsWithEnv(vfsOptions, envVars, "vfs", vfsTags, logger)
-	updateOptionsWithEnv(mountOptions, envVars, "mount", mountTags, logger)
+	logger.Debug().Interface("envVars", envVars).Msg("Augmenting options with environment variables")
 
-	logger.Debug().Interface("mountOptions", mountOptions).Msg("Updated Mount Options")
+	vfsEnvs := envVars
+	mountEnvs := envVars
+
+	// Update options using extracted config tags
+	updateOptionsWithEnv(vfsOptions, vfsEnvs, "vfs", vfsTags, logger)
 	logger.Debug().Interface("vfsOptions", vfsOptions).Msg("Updated VFS Options")
+
+	updateOptionsWithEnv(mountOptions, mountEnvs, "mount", mountTags, logger)
+	logger.Debug().Interface("mountOptions", mountOptions).Msg("Updated Mount Options")
 
 	vfsPayloadJson, err := json.Marshal(vfsOptions)
 	if err != nil {
@@ -116,6 +124,8 @@ func extractConfigTags(opt interface{}, logger zerolog.Logger) map[string]string
 }
 
 func updateOptionsWithEnv(options map[string]interface{}, envVars map[string]string, section string, configTags map[string]string, logger zerolog.Logger) {
+	logger.Debug().Str("section", section).Interface("options", options).Msg("Updating options from environment variables")
+
 	for key, value := range envVars {
 		if strings.HasPrefix(key, fmt.Sprintf("RCLONE_%s_", strings.ToUpper(section))) {
 			cleanKey := strings.TrimPrefix(key, fmt.Sprintf("RCLONE_%s_", strings.ToUpper(section)))
@@ -224,7 +234,7 @@ func setupMountsFromConfig(conf *config.Config, logger zerolog.Logger) {
 		instance := &MountedEndpoint{
 			BackendName: mount.BackendName,
 			MountPoint:  mount.MountPoint,
-			EnvVars:     mount.Environment,
+			Environment: mount.Environment,
 		}
 		if existing, ok := getMountedEndpoint(mount.BackendName); ok {
 			if existing.MountPoint != instance.MountPoint {

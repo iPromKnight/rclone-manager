@@ -16,7 +16,7 @@ var (
 type MountedEndpoint struct {
 	BackendName string
 	MountPoint  string
-	EnvVars     map[string]string
+	Environment map[string]string
 }
 
 func SetRCDEnv(env map[string]interface{}) {
@@ -37,7 +37,7 @@ func InitializeMounts(conf *config.Config, logger zerolog.Logger, processLock *s
 		instance := &MountedEndpoint{
 			BackendName: mount.BackendName,
 			MountPoint:  mount.MountPoint,
-			EnvVars:     mount.Environment,
+			Environment: mount.Environment,
 		}
 		StartMountWithRetries(instance, logger)
 	}

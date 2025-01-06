@@ -39,10 +39,10 @@ func MonitorServeProcesses(logger zerolog.Logger) {
 					Msgf("Process (PID: %d) died. Restarting...", serveProcess.PID)
 
 				newServe := &ServeProcess{
-					Backend:  serveProcess.Backend,
-					Protocol: serveProcess.Protocol,
-					Addr:     serveProcess.Addr,
-					EnvVars:  serveProcess.EnvVars,
+					Backend:     serveProcess.Backend,
+					Protocol:    serveProcess.Protocol,
+					Addr:        serveProcess.Addr,
+					Environment: serveProcess.Environment,
 				}
 
 				newProcess := StartServeWithRetries(newServe, logger)
