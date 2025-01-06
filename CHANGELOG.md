@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/iPromKnight/rclone-manager/compare/v1.1.3...v1.2.0) (2025-01-06)
+
+
+### 🚀 New Features
+
+* ditch rcd for mount processes instead. ([a0de4a0](https://github.com/iPromKnight/rclone-manager/commit/a0de4a02354e4b5b65f40b0f355e2f0ddfbf39c8))
+
 ## [1.1.3](https://github.com/iPromKnight/rclone-manager/compare/v1.1.2...v1.1.3) (2025-01-06)
 
 
