@@ -4,8 +4,7 @@ mounts:
   - backendName: "AllDebrid"
     # This is the path to the mountpoint on the host
     mountPoint: "/mnt/rclone/alldebrid"
-    # These will be fully converted to vfsOpt and mountOpt payloads for the rclone mount command through RC. You can use your regular rclone env vars.
-    # They override the shared options in the environment section of the compose / running container for this specific mount.
+    # These override the shared options in the environment section of the compose / running container for this specific mount.
     environment:
       RCLONE_BWLIMIT: off
       RCLONE_READ_ONLY: true

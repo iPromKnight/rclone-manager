@@ -22,11 +22,16 @@ func MonitorMountProcesses(logger zerolog.Logger) {
 	shouldMonitorProcesses = true
 
 	for {
+		logger.Debug().Msg("Checking mount processes...")
 		if !shouldMonitorProcesses {
 			logger.Info().Msg("Stopping rclone mount process monitor")
 			break
 		}
 		tracker.Range(func(key, value interface{}) bool {
+			if !shouldMonitorProcesses {
+				return false
+			}
+
 			mountProcess := value.(*MountProcess)
 
 			if time.Since(mountProcess.StartedAt) < mountProcess.GracePeriod {
@@ -38,14 +43,26 @@ func MonitorMountProcesses(logger zerolog.Logger) {
 				logger.Warn().Str(constants.LogBackend, mountProcess.BackendName).
 					Msgf("Process (PID: %d) died. Restarting...", mountProcess.PID)
 
+				if !shouldMonitorProcesses {
+					return false
+				}
+
 				UnmountEndpoint(mountProcess, logger)
 
-				newServe := &MountProcess{
+				if !shouldMonitorProcesses {
+					return false
+				}
+
+				newMount := &MountProcess{
 					MountPoint:    mountProcess.MountPoint,
 					RcloneProcess: mountProcess.RcloneProcess,
 				}
 
-				newProcess := StartMountWithRetries(newServe, logger)
+				newProcess := StartMountWithRetries(newMount, logger)
+
+				if !shouldMonitorProcesses {
+					return false
+				}
 
 				if newProcess != nil {
 					tracker.Track(newProcess.BackendName, newProcess)
@@ -56,6 +73,8 @@ func MonitorMountProcesses(logger zerolog.Logger) {
 						Msg("Failed to restart mount process")
 				}
 			}
+
+			logger.Debug().Str("MountPoint", mountProcess.MountPoint).Msg("Mount is mounted fine. Nothing to do.")
 			return true
 		})
 		time.Sleep(10 * time.Second)

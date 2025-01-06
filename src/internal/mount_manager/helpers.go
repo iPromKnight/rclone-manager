@@ -76,3 +76,17 @@ func removeStaleMounts(conf *config.Config, logger zerolog.Logger) {
 		}
 	}
 }
+
+func ensureExists(mountPoint string, logger zerolog.Logger) {
+	if _, err := os.Stat(mountPoint); os.IsNotExist(err) {
+		logger.Info().Str(constants.LogMountPoint, mountPoint).Msg("Creating mount point...")
+		err := os.MkdirAll(mountPoint, 0777)
+		if err != nil {
+			logger.Error().Err(err).Str(constants.LogMountPoint, mountPoint).
+				Msg("Failed to create mount point")
+		} else {
+			logger.Info().Str(constants.LogMountPoint, mountPoint).
+				Msg("Mount point created successfully.")
+		}
+	}
+}

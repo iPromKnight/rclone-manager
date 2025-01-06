@@ -15,8 +15,7 @@ services:
     security_opt:
       - apparmor:unconfined
     volumes:
-      - ./config.yaml:/data/config.yaml
-      - ./rclone.conf:/data/rclone.conf
+      - ./data:/data
       - ./local-dev/mnt/rclone:/mnt/rclone:shared
       - ./local-dev/caches/rclone:/caches/rclone
     environment:

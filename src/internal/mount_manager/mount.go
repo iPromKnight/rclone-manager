@@ -34,6 +34,7 @@ func InitializeMountEndpoints(conf *config.Config, logger zerolog.Logger, proces
 func StartMountWithRetries(instance *MountProcess, logger zerolog.Logger) *MountProcess {
 	retries := 0
 	for retries < 3 {
+		ensureExists(instance.MountPoint, logger)
 		cmd := createMountCommand(instance)
 		instance.Command = cmd
 		err := cmd.Start()
@@ -46,6 +47,18 @@ func StartMountWithRetries(instance *MountProcess, logger zerolog.Logger) *Mount
 			instance.StartedAt = time.Now()
 			instance.GracePeriod = 10 * time.Second
 			tracker.Track(instance.BackendName, instance)
+			go func() {
+				err := cmd.Wait()
+				if err != nil {
+					logger.Warn().AnErr(constants.LogError, err).
+						Str(constants.LogBackend, instance.BackendName).
+						Msg("Mount process exited with error.")
+				} else {
+					logger.Info().
+						Str(constants.LogBackend, instance.BackendName).
+						Msg("Mount process exited normally.")
+				}
+			}()
 			return instance
 		}
 		logger.Warn().AnErr(constants.LogError, err).Msgf("Mount failed. Retrying %d/3...", retries+1)
@@ -58,6 +71,7 @@ func StartMountWithRetries(instance *MountProcess, logger zerolog.Logger) *Mount
 
 func StopMount(instance *MountProcess, logger zerolog.Logger) {
 	logger.Info().Str(constants.LogBackend, instance.BackendName).Msg("Stopping mount process...")
+	UnmountEndpoint(instance, logger)
 	if err := instance.Command.Process.Kill(); err == nil {
 		tracker.Untrack(instance.BackendName)
 		logger.Info().Int(constants.LogPid, instance.PID).Str(constants.LogBackend, instance.BackendName).Msg("Mount process stopped")
@@ -67,6 +81,7 @@ func StopMount(instance *MountProcess, logger zerolog.Logger) {
 }
 
 func Cleanup(config *config.Config, logger zerolog.Logger) {
+	shouldMonitorProcesses = false
 	logger.Info().Msg("Cleaning up all rclone mount processes")
 	tracker.Range(func(key, value interface{}) bool {
 		instance := value.(*MountProcess)
@@ -82,8 +97,8 @@ func ReconcileMounts(conf *config.Config, logger zerolog.Logger, processLock *sy
 
 	logger.Info().Msg("Reconciling mounts...")
 
-	setupMountsFromConfig(conf, logger)
 	removeStaleMounts(conf, logger)
+	setupMountsFromConfig(conf, logger)
 }
 
 func UnmountEndpoint(mount *MountProcess, logger zerolog.Logger) {

@@ -22,12 +22,17 @@ func MonitorServeProcesses(logger zerolog.Logger) {
 	shouldMonitorProcesses = true
 
 	for {
+		logger.Debug().Msg("Checking serve processes...")
 		if !shouldMonitorProcesses {
 			logger.Info().Msg("Stopping rclone serve process monitor")
 			break
 		}
 		tracker.Range(func(key, value interface{}) bool {
 			serveProcess := value.(*ServeProcess)
+
+			if !shouldMonitorProcesses {
+				return false
+			}
 
 			if time.Since(serveProcess.StartedAt) < serveProcess.GracePeriod {
 				logger.Debug().Int(constants.LogPid, serveProcess.PID).Msg("Skipping process check (within grace period)")
@@ -38,6 +43,10 @@ func MonitorServeProcesses(logger zerolog.Logger) {
 				logger.Warn().Str(constants.LogBackend, serveProcess.BackendName).
 					Msgf("Process (PID: %d) died. Restarting...", serveProcess.PID)
 
+				if !shouldMonitorProcesses {
+					return false
+				}
+
 				newServe := &ServeProcess{
 					Protocol:      serveProcess.Protocol,
 					Addr:          serveProcess.Addr,
@@ -45,6 +54,10 @@ func MonitorServeProcesses(logger zerolog.Logger) {
 				}
 
 				newProcess := StartServeWithRetries(newServe, logger)
+
+				if !shouldMonitorProcesses {
+					return false
+				}
 
 				if newProcess != nil {
 					tracker.Track(newProcess.BackendName, newProcess)
@@ -55,6 +68,7 @@ func MonitorServeProcesses(logger zerolog.Logger) {
 						Msg("Failed to restart serve process")
 				}
 			}
+			logger.Debug().Str("Backend", serveProcess.BackendName).Msg("Serve is fine. Nothing to do.")
 			return true
 		})
 		time.Sleep(10 * time.Second)

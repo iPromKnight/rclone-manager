@@ -48,6 +48,18 @@ func StartServeWithRetries(instance *ServeProcess, logger zerolog.Logger) *Serve
 			instance.StartedAt = time.Now()
 			instance.GracePeriod = 10 * time.Second
 			tracker.Track(instance.BackendName, instance)
+			go func() {
+				err := cmd.Wait()
+				if err != nil {
+					logger.Warn().AnErr(constants.LogError, err).
+						Str(constants.LogBackend, instance.BackendName).
+						Msg("Serve process exited with error.")
+				} else {
+					logger.Info().
+						Str(constants.LogBackend, instance.BackendName).
+						Msg("Serve process exited normally.")
+				}
+			}()
 			return instance
 		}
 		logger.Warn().AnErr(constants.LogError, err).Msgf("Serve failed. Retrying %d/3...", retries+1)
@@ -69,6 +81,7 @@ func StopServe(instance *ServeProcess, logger zerolog.Logger) {
 }
 
 func Cleanup(logger zerolog.Logger) {
+	shouldMonitorProcesses = false
 	logger.Info().Msg("Cleaning up all rclone serve processes")
 	tracker.Range(func(key, value interface{}) bool {
 		instance := value.(*ServeProcess)
