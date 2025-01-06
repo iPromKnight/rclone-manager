@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.2](https://github.com/iPromKnight/rclone-manager/compare/v1.1.1...v1.1.2) (2025-01-04)
+
+
+### 📦 CI Improvements
+
+* default context should be src folder ([569d39c](https://github.com/iPromKnight/rclone-manager/commit/569d39cd1eb50d2783dd974c0d5ac9e01e6c1247))
+
 ## [1.1.1](https://github.com/iPromKnight/rclone-manager/compare/v1.1.0...v1.1.1) (2025-01-04)
 
 
