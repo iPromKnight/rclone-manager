@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.2](https://github.com/iPromKnight/rclone-manager/compare/v1.2.1...v1.2.2) (2025-01-06)
+
+
+### 🔥 Bug Fixes
+
+* remove healthcheck now no rcd ([2316974](https://github.com/iPromKnight/rclone-manager/commit/231697468199cdb676ecbf63c2b5b7bb633327cb))
+
 ## [1.2.1](https://github.com/iPromKnight/rclone-manager/compare/v1.2.0...v1.2.1) (2025-01-06)
 
 
