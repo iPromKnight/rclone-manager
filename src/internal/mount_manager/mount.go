@@ -4,105 +4,76 @@ import (
 	"github.com/rs/zerolog"
 	"rclone-manager/internal/config"
 	"rclone-manager/internal/constants"
+	"rclone-manager/internal/instance_tracker"
 	"sync"
 	"time"
 )
 
-var (
-	instanceMap   sync.Map
-	currentRCDEnv map[string]interface{}
-)
-
-type MountedEndpoint struct {
-	BackendName string
-	MountPoint  string
-	Environment map[string]string
+type MountProcess struct {
+	instance_tracker.RcloneProcess
+	MountPoint string
 }
 
-func SetRCDEnv(env map[string]interface{}) {
-	currentRCDEnv = env
-}
+var tracker instance_tracker.InstanceTracker[MountProcess]
 
-func InitializeMounts(conf *config.Config, logger zerolog.Logger, processLock *sync.Mutex) {
+func InitializeMountEndpoints(conf *config.Config, logger zerolog.Logger, processLock *sync.Mutex) {
 	processLock.Lock()
 	defer processLock.Unlock()
 
 	if len(conf.Mounts) == 0 {
-		logger.Debug().Msg("No rclone mount endpoints defined... Skipping...")
+		logger.Debug().Msg("No rclone mounts endpoints defined... Skipping starting any")
 		return
 	}
+	Cleanup(conf, logger)
+	logger.Info().Msg("Initializing all mounts endpoints")
+	setupMountsFromConfig(conf, logger)
 
-	logger.Info().Msg("Initializing all Mounts")
-	for _, mount := range conf.Mounts {
-		instance := &MountedEndpoint{
-			BackendName: mount.BackendName,
-			MountPoint:  mount.MountPoint,
-			Environment: mount.Environment,
-		}
-		StartMountWithRetries(instance, logger)
-	}
+	go MonitorMountProcesses(logger)
 }
 
-func StartMountWithRetries(instance *MountedEndpoint, logger zerolog.Logger) {
+func StartMountWithRetries(instance *MountProcess, logger zerolog.Logger) *MountProcess {
 	retries := 0
 	for retries < 3 {
-		ensureMountPointExists(instance.MountPoint, logger)
-		cmd := createMountCommand(instance, logger)
-		if cmd != nil {
-			err := cmd.Run()
-			if err == nil {
-				logger.Info().Str(constants.LogBackend, instance.BackendName).
-					Str(constants.LogMountPoint, instance.MountPoint).
-					Msg("Mount successful.")
-				trackEndpoint(instance)
-				return
-			}
+		cmd := createMountCommand(instance)
+		instance.Command = cmd
+		err := cmd.Start()
+		if err == nil {
+			logger.Info().
+				Str(constants.LogBackend, instance.BackendName).
+				Str(constants.LogMountPoint, instance.MountPoint).
+				Msg("Mount started successfully.")
+			instance.PID = cmd.Process.Pid
+			instance.StartedAt = time.Now()
+			instance.GracePeriod = 10 * time.Second
+			tracker.Track(instance.BackendName, instance)
+			return instance
 		}
-		logger.Warn().Msgf("Mount failed. Retrying %d/3...", retries+1)
+		logger.Warn().AnErr(constants.LogError, err).Msgf("Mount failed. Retrying %d/3...", retries+1)
 		retries++
 		time.Sleep(5 * time.Second)
 	}
-	logger.Error().Str(constants.LogBackend, instance.BackendName).Msg("Failed to mount after 3 attempts.")
+	logger.Error().Str(constants.LogBackend, instance.BackendName).Msg("Failed to start Mount after 3 attempts.")
+	return nil
 }
 
-func StopAllMountsViaRCD(logger zerolog.Logger) {
-	logger.Info().Msg("Unmounting all rclone mounts")
-	cmd := createUnmountAllCommand()
-	err := cmd.Run()
-	if err != nil {
-		logger.Error().AnErr(constants.LogError, err).Msg("Failed to unmount all rclone mounts")
-		return
+func StopMount(instance *MountProcess, logger zerolog.Logger) {
+	logger.Info().Str(constants.LogBackend, instance.BackendName).Msg("Stopping mount process...")
+	if err := instance.Command.Process.Kill(); err == nil {
+		tracker.Untrack(instance.BackendName)
+		logger.Info().Int(constants.LogPid, instance.PID).Str(constants.LogBackend, instance.BackendName).Msg("Mount process stopped")
+	} else {
+		logger.Warn().AnErr(constants.LogError, err).Int(constants.LogPid, instance.PID).Str(constants.LogBackend, instance.BackendName).Msg("Failed to stop mount process")
 	}
-
-	instanceMap.Clear()
-	logger.Info().Msg("Unmounted all rclone mounts successfully.")
 }
 
-func UnmountInstanceViaRcdWithFuseFallback(instance *MountedEndpoint, logger zerolog.Logger) bool {
-	logger.Info().Str(constants.LogBackend, instance.BackendName).
-		Str(constants.LogMountPoint, instance.MountPoint).
-		Msg("Unmounting Endpoint")
-
-	cmd := createUnmountCommand(instance)
-	err := cmd.Run()
-	if err != nil {
-		logger.Error().AnErr(constants.LogError, err).
-			Msg("Failed to unmount via rc. Falling back to fusermount.")
-		cmd := createFuseUnmountCommand(instance)
-		err := cmd.Run()
-		if err != nil {
-			logger.Error().Str(constants.LogBackend, instance.BackendName).
-				Str(constants.LogMountPoint, instance.MountPoint).
-				AnErr(constants.LogError, err).
-				Msg("Failed to unmount rclone mount via fuse fallback")
-			return false
-		}
-	}
-
-	logger.Info().Str(constants.LogBackend, instance.BackendName).
-		Str(constants.LogMountPoint, instance.MountPoint).
-		Msg("Unmounted mount-point successfully.")
-	return true
+func Cleanup(config *config.Config, logger zerolog.Logger) {
+	logger.Info().Msg("Cleaning up all rclone mount processes")
+	tracker.Range(func(key, value interface{}) bool {
+		instance := value.(*MountProcess)
+		StopMount(instance, logger)
+		return true
+	})
+	UnmountAllByPath(config, logger)
 }
 
 func ReconcileMounts(conf *config.Config, logger zerolog.Logger, processLock *sync.Mutex) {
@@ -115,20 +86,24 @@ func ReconcileMounts(conf *config.Config, logger zerolog.Logger, processLock *sy
 	removeStaleMounts(conf, logger)
 }
 
+func UnmountEndpoint(mount *MountProcess, logger zerolog.Logger) {
+	cmd := createFuseUnmountCommand(&MountProcess{MountPoint: mount.MountPoint})
+	err := cmd.Run()
+	if err != nil {
+		logger.Debug().AnErr(constants.LogError, err).
+			Str(constants.LogMountPoint, mount.MountPoint).
+			Msg("Failed to unmount path. It may not be mounted.")
+	} else {
+		logger.Info().Str(constants.LogMountPoint, mount.MountPoint).
+			Msg("Unmounted successfully.")
+	}
+}
+
 func UnmountAllByPath(conf *config.Config, logger zerolog.Logger) {
 	logger.Info().Msg("Unmounting all paths listed in config...")
 
 	for _, mount := range conf.Mounts {
 		logger.Info().Str(constants.MountPoint, mount.MountPoint).Msg("Unmounting...")
-		cmd := createFuseUnmountCommand(&MountedEndpoint{MountPoint: mount.MountPoint})
-		err := cmd.Run()
-		if err != nil {
-			logger.Debug().AnErr(constants.LogError, err).
-				Str(constants.LogMountPoint, mount.MountPoint).
-				Msg("Failed to unmount path. It may not be mounted.")
-		} else {
-			logger.Info().Str(constants.LogMountPoint, mount.MountPoint).
-				Msg("Unmounted successfully.")
-		}
+		UnmountEndpoint(&MountProcess{MountPoint: mount.MountPoint}, logger)
 	}
 }

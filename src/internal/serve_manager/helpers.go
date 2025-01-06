@@ -8,18 +8,11 @@ import (
 	"rclone-manager/internal/config"
 	"rclone-manager/internal/constants"
 	"rclone-manager/internal/environment"
+	"rclone-manager/internal/instance_tracker"
 )
 
-func getServeInstance(key string) (*ServeProcess, bool) {
-	if val, ok := processMap.Load(key); ok {
-		instance, valid := val.(*ServeProcess)
-		return instance, valid
-	}
-	return nil, false
-}
-
 func createServeCommand(instance *ServeProcess) *exec.Cmd {
-	backendArg := fmt.Sprintf("%s:", instance.Backend)
+	backendArg := fmt.Sprintf("%s:", instance.BackendName)
 
 	cmd := exec.Command(
 		constants.Rclone, constants.Serve, instance.Protocol, backendArg, constants.Addr, instance.Addr)
@@ -31,23 +24,17 @@ func createServeCommand(instance *ServeProcess) *exec.Cmd {
 	return cmd
 }
 
-func trackServe(instance *ServeProcess) {
-	processMap.Store(instance.Backend, instance)
-}
-
-func untrackServe(instance *ServeProcess) {
-	processMap.Delete(instance.Backend)
-}
-
 func setupServesFromConfig(conf *config.Config, logger zerolog.Logger) {
 	for _, serve := range conf.Serves {
 		instance := &ServeProcess{
-			Backend:     serve.BackendName,
-			Protocol:    serve.Protocol,
-			Addr:        serve.Addr,
-			Environment: serve.Environment,
+			Protocol: serve.Protocol,
+			Addr:     serve.Addr,
+			RcloneProcess: instance_tracker.RcloneProcess{
+				BackendName: serve.BackendName,
+				Environment: serve.Environment,
+			},
 		}
-		if existing, ok := getServeInstance(serve.BackendName); ok {
+		if existing, ok := tracker.Get(serve.BackendName); ok {
 			if existing.Protocol != serve.Protocol || existing.Addr != serve.Addr {
 				logger.Warn().
 					Str(constants.LogBackend, serve.BackendName).
@@ -67,11 +54,11 @@ func setupServesFromConfig(conf *config.Config, logger zerolog.Logger) {
 func removeStaleServes(conf *config.Config, logger zerolog.Logger) {
 	var staleKeys []interface{}
 
-	processMap.Range(func(key, value interface{}) bool {
+	tracker.Range(func(key, value interface{}) bool {
 		instance := value.(*ServeProcess)
-		if !config.IsServeInConfig(instance.Backend, conf) {
+		if !config.IsServeInConfig(instance.BackendName, conf) {
 			logger.Warn().
-				Str(constants.LogBackend, instance.Backend).
+				Str(constants.LogBackend, instance.BackendName).
 				Msg("Serve removed from config, stopping...")
 			staleKeys = append(staleKeys, key)
 		}
@@ -79,7 +66,7 @@ func removeStaleServes(conf *config.Config, logger zerolog.Logger) {
 	})
 
 	for _, key := range staleKeys {
-		if instance, ok := getServeInstance(key.(string)); ok {
+		if instance, ok := tracker.Get(key.(string)); ok {
 			StopServe(instance, logger)
 		}
 	}

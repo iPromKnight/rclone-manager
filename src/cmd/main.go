@@ -25,13 +25,13 @@ func main() {
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 
-	rclone_manager.InitializeRCD(logger)
+	rclone_manager.InitializeRClone(logger)
 
 	for {
 		select {
 		case sig := <-sigs:
 			logger.Warn().Msgf("Received signal %v, shutting down...", sig)
-			rclone_manager.StopRcloneRemoteDaemon(logger)
+			rclone_manager.StopRclone(logger)
 			os.Exit(0)
 		default:
 			time.Sleep(1 * time.Second)

@@ -26,7 +26,7 @@ func MonitorServeProcesses(logger zerolog.Logger) {
 			logger.Info().Msg("Stopping rclone serve process monitor")
 			break
 		}
-		processMap.Range(func(key, value interface{}) bool {
+		tracker.Range(func(key, value interface{}) bool {
 			serveProcess := value.(*ServeProcess)
 
 			if time.Since(serveProcess.StartedAt) < serveProcess.GracePeriod {
@@ -35,24 +35,23 @@ func MonitorServeProcesses(logger zerolog.Logger) {
 			}
 
 			if !utils.ProcessIsRunning(serveProcess.PID) {
-				logger.Warn().Str(constants.LogBackend, serveProcess.Backend).
+				logger.Warn().Str(constants.LogBackend, serveProcess.BackendName).
 					Msgf("Process (PID: %d) died. Restarting...", serveProcess.PID)
 
 				newServe := &ServeProcess{
-					Backend:     serveProcess.Backend,
-					Protocol:    serveProcess.Protocol,
-					Addr:        serveProcess.Addr,
-					Environment: serveProcess.Environment,
+					Protocol:      serveProcess.Protocol,
+					Addr:          serveProcess.Addr,
+					RcloneProcess: serveProcess.RcloneProcess,
 				}
 
 				newProcess := StartServeWithRetries(newServe, logger)
 
 				if newProcess != nil {
-					trackServe(newProcess)
-					logger.Info().Str(constants.LogBackend, serveProcess.Backend).
+					tracker.Track(newProcess.BackendName, newProcess)
+					logger.Info().Str(constants.LogBackend, serveProcess.BackendName).
 						Msgf("Successfully restarted serve with new PID: %d", newProcess.PID)
 				} else {
-					logger.Error().Str(constants.LogBackend, serveProcess.Backend).
+					logger.Error().Str(constants.LogBackend, serveProcess.BackendName).
 						Msg("Failed to restart serve process")
 				}
 			}

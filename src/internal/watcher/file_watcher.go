@@ -43,6 +43,14 @@ func (w *Watcher) Watch(files []string) {
 	}()
 }
 
+func StartNewFileWatcher(filesToWatch []string, f func(file string, logger zerolog.Logger), logger zerolog.Logger) {
+	wrappedCallback := func(file string) {
+		f(file, logger)
+	}
+	w := NewWatcher(wrappedCallback, logger)
+	w.Watch(filesToWatch)
+}
+
 func (w *Watcher) Close() {
 	_ = w.watcher.Close()
 }

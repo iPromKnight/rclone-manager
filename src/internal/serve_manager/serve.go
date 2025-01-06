@@ -2,32 +2,20 @@ package serve_manager
 
 import (
 	"github.com/rs/zerolog"
-	"os/exec"
 	"rclone-manager/internal/config"
 	"rclone-manager/internal/constants"
+	"rclone-manager/internal/instance_tracker"
 	"sync"
 	"time"
 )
 
 type ServeProcess struct {
-	PID         int
-	Command     *exec.Cmd
-	Backend     string
-	Protocol    string
-	Addr        string
-	StartedAt   time.Time
-	GracePeriod time.Duration
-	Environment map[string]string
+	instance_tracker.RcloneProcess
+	Protocol string
+	Addr     string
 }
 
-var (
-	processMap    sync.Map
-	currentRCDEnv map[string]interface{}
-)
-
-func SetRCDEnv(env map[string]interface{}) {
-	currentRCDEnv = env
-}
+var tracker instance_tracker.InstanceTracker[ServeProcess]
 
 func InitializeServeEndpoints(conf *config.Config, logger zerolog.Logger, processLock *sync.Mutex) {
 	processLock.Lock()
@@ -39,15 +27,7 @@ func InitializeServeEndpoints(conf *config.Config, logger zerolog.Logger, proces
 	}
 
 	logger.Info().Msg("Initializing all serve endpoints")
-	for _, serve := range conf.Serves {
-		instance := &ServeProcess{
-			Backend:     serve.BackendName,
-			Protocol:    serve.Protocol,
-			Addr:        serve.Addr,
-			Environment: serve.Environment,
-		}
-		StartServeWithRetries(instance, logger)
-	}
+	setupServesFromConfig(conf, logger)
 
 	go MonitorServeProcesses(logger)
 }
@@ -60,37 +40,37 @@ func StartServeWithRetries(instance *ServeProcess, logger zerolog.Logger) *Serve
 		err := cmd.Start()
 		if err == nil {
 			logger.Info().
-				Str(constants.LogBackend, instance.Backend).
+				Str(constants.LogBackend, instance.BackendName).
 				Str(constants.LogProtocol, instance.Protocol).
 				Str(constants.LogAddr, instance.Addr).
 				Msg("Serve started successfully.")
 			instance.PID = cmd.Process.Pid
 			instance.StartedAt = time.Now()
 			instance.GracePeriod = 10 * time.Second
-			trackServe(instance)
+			tracker.Track(instance.BackendName, instance)
 			return instance
 		}
 		logger.Warn().AnErr(constants.LogError, err).Msgf("Serve failed. Retrying %d/3...", retries+1)
 		retries++
 		time.Sleep(5 * time.Second)
 	}
-	logger.Error().Str(constants.LogBackend, instance.Backend).Msg("Failed to start serve after 3 attempts.")
+	logger.Error().Str(constants.LogBackend, instance.BackendName).Msg("Failed to start serve after 3 attempts.")
 	return nil
 }
 
 func StopServe(instance *ServeProcess, logger zerolog.Logger) {
-	logger.Info().Str(constants.LogBackend, instance.Backend).Msg("Stopping serve process...")
+	logger.Info().Str(constants.LogBackend, instance.BackendName).Msg("Stopping serve process...")
 	if err := instance.Command.Process.Kill(); err == nil {
-		untrackServe(instance)
-		logger.Info().Int(constants.LogPid, instance.PID).Str(constants.LogBackend, instance.Backend).Msg("Serve process stopped")
+		tracker.Untrack(instance.BackendName)
+		logger.Info().Int(constants.LogPid, instance.PID).Str(constants.LogBackend, instance.BackendName).Msg("Serve process stopped")
 	} else {
-		logger.Warn().AnErr(constants.LogError, err).Int(constants.LogPid, instance.PID).Str(constants.LogBackend, instance.Backend).Msg("Failed to stop serve process")
+		logger.Warn().AnErr(constants.LogError, err).Int(constants.LogPid, instance.PID).Str(constants.LogBackend, instance.BackendName).Msg("Failed to stop serve process")
 	}
 }
 
 func Cleanup(logger zerolog.Logger) {
 	logger.Info().Msg("Cleaning up all rclone serve processes")
-	processMap.Range(func(key, value interface{}) bool {
+	tracker.Range(func(key, value interface{}) bool {
 		instance := value.(*ServeProcess)
 		StopServe(instance, logger)
 		return true

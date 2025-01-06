@@ -4,22 +4,15 @@ package constants
 const (
 	Rclone     = "rclone"
 	Serve      = "serve"
-	Rcd        = "rcd"
-	Rc         = "rc"
-	Mount      = "mount/mount"
-	UnmountAll = "mount/unmountall"
-	Unmount    = "mount/unmount"
+	Mount      = "mount"
 	MountPoint = "mountPoint="
-	Fs         = "fs="
 	Addr       = "--addr"
-	VfsOpt     = "vfsOpt="
-	MountOpt   = "mountOpt="
 )
 
 // Constants for fusermount
 const (
 	Fusermount  = "fusermount"
-	FuseUnmount = "-u"
+	FuseUnmount = "-uz"
 )
 
 // Log constants
