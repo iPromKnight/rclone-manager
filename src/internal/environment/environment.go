@@ -25,6 +25,14 @@ func PrepareEnvironment(envVars map[string]string) []string {
 	return mapToSlice(envMap)
 }
 
+func GetEnvWithFallback(key, defaultValue string) string {
+	value := os.Getenv(key)
+	if value == "" {
+		return defaultValue
+	}
+	return value
+}
+
 func splitEnv(env string) []string {
 	parts := make([]string, 2)
 	idx := strings.Index(env, "=")

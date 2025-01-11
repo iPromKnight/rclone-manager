@@ -4,6 +4,7 @@ import (
 	"gopkg.in/yaml.v3"
 	"os"
 	"rclone-manager/internal/constants"
+	"rclone-manager/internal/environment"
 )
 
 type Config struct {
@@ -22,7 +23,8 @@ type Config struct {
 }
 
 func LoadConfig() (*Config, error) {
-	data, err := os.ReadFile(constants.YAMLPath)
+	yamlPath := environment.GetEnvWithFallback(constants.YAMLPathEnvVar, constants.DefaultYAMLPath)
+	data, err := os.ReadFile(yamlPath)
 	if err != nil {
 		return nil, err
 	}
