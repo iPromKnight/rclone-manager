@@ -28,6 +28,8 @@ const (
 
 // Constants data files
 const (
-	YAMLPath   = "/data/config.yaml"
-	RcloneConf = "/data/rclone.conf"
+	YAMLPathEnvVar    = "RCLONE_MANAGER_CONFIG_YAML"
+	DefaultYAMLPath   = "/data/config.yaml"
+	RcloneConfEnvVar  = "RCLONE_MANAGER_RCLONE_CONF"
+	DefaultRcloneConf = "/data/rclone.conf"
 )

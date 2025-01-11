@@ -4,6 +4,7 @@ import (
 	"github.com/rs/zerolog"
 	"rclone-manager/internal/config"
 	"rclone-manager/internal/constants"
+	"rclone-manager/internal/environment"
 	"rclone-manager/internal/mount_manager"
 	"rclone-manager/internal/serve_manager"
 	"rclone-manager/internal/watcher"
@@ -41,9 +42,12 @@ func InitializeRClone(logger zerolog.Logger) {
 		go mount_manager.InitializeMountEndpoints(conf, logger, &processLock)
 	}
 
+	yamlPath := environment.GetEnvWithFallback(constants.YAMLPathEnvVar, constants.DefaultYAMLPath)
+	rcloneConfPath := environment.GetEnvWithFallback(constants.RcloneConfEnvVar, constants.DefaultRcloneConf)
+
 	filesToWatch := []string{
-		constants.YAMLPath,
-		constants.RcloneConf,
+		yamlPath,
+		rcloneConfPath,
 	}
 
 	watcher.StartNewFileWatcher(filesToWatch, reloadConfig, logger)
