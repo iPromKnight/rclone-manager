@@ -13,9 +13,9 @@ import (
 
 func createMountCommand(instance *MountProcess) *exec.Cmd {
 	backendArg := fmt.Sprintf("%s:", instance.BackendName)
+	rcloneBin := environment.GetEnvWithFallback(constants.RcloneBinaryNameEnvVar, constants.DefaultRcloneBinaryName)
 
-	cmd := exec.Command(
-		constants.Rclone, constants.Mount, backendArg, instance.MountPoint)
+	cmd := exec.Command(rcloneBin, constants.Mount, backendArg, instance.MountPoint)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 

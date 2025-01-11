@@ -13,9 +13,8 @@ import (
 
 func createServeCommand(instance *ServeProcess) *exec.Cmd {
 	backendArg := fmt.Sprintf("%s:", instance.BackendName)
-
-	cmd := exec.Command(
-		constants.Rclone, constants.Serve, instance.Protocol, backendArg, constants.Addr, instance.Addr)
+	rcloneBin := environment.GetEnvWithFallback(constants.RcloneBinaryNameEnvVar, constants.DefaultRcloneBinaryName)
+	cmd := exec.Command(rcloneBin, constants.Serve, instance.Protocol, backendArg, constants.Addr, instance.Addr)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 

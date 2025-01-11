@@ -2,7 +2,6 @@ package constants
 
 // Constants for rclone
 const (
-	Rclone     = "rclone"
 	Serve      = "serve"
 	Mount      = "mount"
 	MountPoint = "mountPoint="
@@ -28,8 +27,12 @@ const (
 
 // Constants data files
 const (
-	YAMLPathEnvVar    = "RCLONE_MANAGER_CONFIG_YAML"
-	DefaultYAMLPath   = "/data/config.yaml"
+	YAMLPathEnvVar  = "RCLONE_MANAGER_CONFIG_YAML"
+	DefaultYAMLPath = "/data/config.yaml"
+
 	RcloneConfEnvVar  = "RCLONE_MANAGER_RCLONE_CONF"
 	DefaultRcloneConf = "/data/rclone.conf"
+
+	RcloneBinaryNameEnvVar  = "RCLONE_MANAGER_RCLONE_BIN_NAME"
+	DefaultRcloneBinaryName = "rclone"
 )
