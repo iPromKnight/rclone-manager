@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.5](https://github.com/iPromKnight/rclone-manager/compare/v1.2.4...v1.2.5) (2025-01-15)
+
+
+### ⌨️ Code Refactoring
+
+* allow overriding puid and pgid ([4dffda8](https://github.com/iPromKnight/rclone-manager/commit/4dffda88298d1c45f8f5099f98a31194afe9fe03))
+
 ## [1.2.4](https://github.com/iPromKnight/rclone-manager/compare/v1.2.3...v1.2.4) (2025-01-11)
 
 
