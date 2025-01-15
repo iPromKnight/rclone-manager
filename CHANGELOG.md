@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.6](https://github.com/iPromKnight/rclone-manager/compare/v1.2.5...v1.2.6) (2025-01-15)
+
+
+### 🔥 Bug Fixes
+
+* ensure allow other added to fuse ([3a150d7](https://github.com/iPromKnight/rclone-manager/commit/3a150d706df539ad9eeae9bf199a1f2f0041e409))
+
 ## [1.2.5](https://github.com/iPromKnight/rclone-manager/compare/v1.2.4...v1.2.5) (2025-01-15)
 
 
