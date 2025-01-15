@@ -23,4 +23,6 @@ COPY --from=build /app/entrypoint.sh /entrypoint.sh
 
 RUN chmod +x /entrypoint.sh
 
+RUN echo "user_allow_other" >> /etc/fuse.conf
+
 ENTRYPOINT ["/entrypoint.sh"]
