@@ -1,6 +1,9 @@
 services:
   rclone-manager:
     image: ipromknight/rclone-manager:latest
+    build:
+      context: src
+      dockerfile: Dockerfile
     container_name: rclone-manager
     restart: unless-stopped
     stop_signal: SIGTERM
@@ -33,7 +36,7 @@ services:
       RCLONE_UMASK: 002
       RCLONE_UID: 568
       RCLONE_GID: 568
-      RCLONE_ALLOW_NON_EMPTY: true
+      RCLONE_ALLOW_NON_EMPTY: false
       RCLONE_ALLOW_OTHER: true
       RCLONE_BUFFER_SIZE: 0
       RCLONE_DIR_CACHE_TIME: 10s
@@ -50,7 +53,7 @@ services:
       RCLONE_VFS_READ_CHUNK_SIZE_LIMIT: 0
       RCLONE_VFS_READ_WAIT: 5ms
       RCLONE_VFS_REFRESH: true
-      RCLONE_READ_ONLY: true
+      RCLONE_READ_ONLY: false
       RCLONE_NO_MODTIME: true
       RCLONE_MULTI_THREAD_STREAMS: 1
       RCLONE_TRANSFERS: 4
